@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# Author: Francesca Ferrari
+#
+# The program produces the list of users in a group.
+# 
+#   Can a user have multiple primary groups? 
+#   NO, primary groups are unique, i.e. a user is assigned exactly one primary group
+#   Can a group be the primary one for multiple users? 
+#   YES [think of students], but! NONE of the users will appear as additional members of the group 
+#   in /etc/group file since it’s their primary group.
+#   Can a group have no primary user?
+#   YES
+
+#
+# Usage:
+#   group_users [-v|-p|-o] group-name
+#   (only one option supported at a time)
+#
+# Options:
+#   -v  Verbose 
+#   -p  Print only primary user
+#   -o  Print all the users except the primary
+#   
+# Output:
+#   List of users in group
+#
+# Error Messages:
+#   - Wrong number of input arguments
+#   - Group does not exist
+#
+
+error() {
+  # print fatal error message (the argument list) on stderr, then exit 
+  # -- also gives usage message	
+  local progname=$(basename $0)
+  echo "$progname: ERROR: $*" >&2
+  echo "$progname: usage: $progname group-name" >&2
+  exit 1
+}
+
+verbose=false
+primary=false
+others=false
+
+# input validation
+if [ "$1" = "-v" ]; then
+  verbose=true
+  shift
+elif [ "$1" = "-p" ]; then
+  primary=true
+  shift
+elif [ "$1" = "-o" ]; then
+  others=true
+  shift
+fi  
+
+[ "$#" -ne 1 ] && error "wrong number of input arguments"
+
+gr="$1"
+
+group_id=$(grep ^"$gr": /etc/group | cut -d: -f3)
+[ -z "$group_id" ] && error "group does not exist"
+
+users_primary_group=$(grep ^[^:]*:[^:]*:[^:]*:"$group_id": /etc/passwd | cut -d: -f1 | tr " " "\n")
+#other_users=$(grep :[^:]*$ /etc/group)
+other_users=$(grep ^"$gr": /etc/group | cut -d: -f4 | tr "," "\n")
+
+if [ "$verbose" = "true" ]; then
+  echo "PRIMARY GROUP USERS:" 
+  [ -n "$users_primary_group" ] && echo "$users_primary_group"
+  echo "OTHER USERS:" 
+  [ -n "$other_users" ] && echo "$other_users"
+elif [ "$primary" = "true" ]; then
+  [ -n "$users_primary_group" ] && echo "$users_primary_group"
+elif [ "$others" = "true" ]; then
+  [ -n "$other_users" ] && echo "$other_users"
+else
+  [ -n "$users_primary_group" ] && echo "$users_primary_group"
+  [ -n "$other_users" ] && echo "$other_users"
+fi  	
+
+exit 0
